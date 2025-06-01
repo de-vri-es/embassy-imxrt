@@ -8,6 +8,12 @@ license = "MIT"
 lto = true # better optimizations
 debug = 2  # enough information for defmt/rtt
 
+[profile.dev]
+lto = true # better optimizations
+debug = 2  # enough information for defmt/rtt
+opt-level = 3
+panic = "abort"
+
 [dependencies]
 cortex-m = { version = "0.7.7", features = [
     "inline-asm",

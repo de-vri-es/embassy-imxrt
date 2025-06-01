@@ -87,6 +87,40 @@ impl<'a> FlexSpiNorFlash<'a> {
         me
     }
 
+    /// Read the flash ID.
+    pub fn read_id(&mut self) -> Result<u32, ReadError> {
+        trace!("Clearing RX FIFO");
+        self.flex_spi.clear_rx_fifo();
+        trace!("Starting command sequence");
+        self.flex_spi.start_command_sequence(CommandSequence {
+            start: 7,
+            count: 1,
+            address: 0,
+            data_size: 64,
+            parallel: false,
+        }).unwrap_or_else(|_: InvalidCommandSequence| panic!("FlexSPI driver reported invalid command sequence for hard-coded read ID (XPI) sequence"));
+        trace!("Waiting for data in RX FIFO");
+        self.flex_spi.wait_rx_ready().map_err(ReadError::WaitRx)?;
+
+        trace!("Reading data from RX FIFO");
+        let mut buffer = [0xAA; 4];
+        let read = self.flex_spi.drain_rx_fifo(&mut buffer);
+        trace!("Read {} bytes", read);
+
+        trace!("Waiting for command to finish");
+        self.flex_spi.wait_command_done().map_err(ReadError::WaitFinish)?;
+
+        if read != buffer.len() {
+            return Err(NotEnoughData {
+                expected: buffer.len(),
+                actual: read,
+            }.into());
+        }
+        trace!("ID buffer: {:02X}", buffer);
+
+        Ok(u32::from_le_bytes(buffer[0..4].try_into().unwrap_or(0xDEADBEEFu32.to_le_bytes())))
+    }
+
     /// Read data from the given flash address.
     ///
     /// NOTE: The address argument is a physical flash address, not a CPU memory address.
@@ -94,12 +128,14 @@ impl<'a> FlexSpiNorFlash<'a> {
         // TODO: check that start and end address are aligned to `read_alignment`.
 
         // Make sure no old data remains in the RX fifo.
+        trace!("Clearing RX FIFO");
         self.flex_spi.clear_rx_fifo();
 
         // Split into reads of at most u16::MAX bytes.
         for (i, mut buffer) in buffer.chunks_mut(u16::MAX as usize).enumerate() {
             let address = address + i as u32 * u16::MAX as u32;
             // Start the read sequence.
+            trace!("Starting command sequence");
             self.flex_spi
                 .start_command_sequence(CommandSequence {
                     start: sequence::READ,
@@ -114,15 +150,20 @@ impl<'a> FlexSpiNorFlash<'a> {
 
             // Drain the RX queue until the read buffer is full.
             while !buffer.is_empty() {
+                trace!("Waiting for data in RX FIFO");
                 self.flex_spi.wait_rx_ready().map_err(ReadError::WaitRx)?;
+                trace!("Reading data from RX FIFO");
                 let read = self.flex_spi.drain_rx_fifo(buffer);
+                trace!("Read {} bytes", read);
                 buffer = &mut buffer[read..];
             }
 
             // Wait for the command to finish (and check for errors).
+            trace!("Waiting for command to finish");
             self.flex_spi.wait_command_done().map_err(ReadError::WaitFinish)?;
         }
 
+        trace!("Read done");
         Ok(())
     }
 
