@@ -106,13 +106,17 @@ impl<'a> FlexSpiNorFlash<'a> {
         trace!("Clearing RX FIFO");
         self.flex_spi.clear_rx_fifo();
         trace!("Starting command sequence");
-        self.flex_spi.start_command_sequence(CommandSequence {
-            start: 7,
-            count: 1,
-            address: 0,
-            data_size: 64,
-            parallel: false,
-        }).unwrap_or_else(|_: InvalidCommandSequence| panic!("FlexSPI driver reported invalid command sequence for hard-coded read ID (XPI) sequence"));
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: 7,
+                    count: 1,
+                    address: 4,
+                    data_size: 512,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| panic!("FlexSPI driver reported invalid command sequence for hard-coded read ID (XPI) sequence"));
+        }
         trace!("Waiting for data in RX FIFO");
         self.flex_spi.wait_rx_ready().map_err(ReadError::WaitRx)?;
 
@@ -150,17 +154,19 @@ impl<'a> FlexSpiNorFlash<'a> {
             let address = address + i as u32 * u16::MAX as u32;
             // Start the read sequence.
             trace!("Starting command sequence");
-            self.flex_spi
-                .start_command_sequence(CommandSequence {
-                    start: sequence::READ,
-                    count: 1,
-                    address,
-                    data_size: buffer.len() as u16,
-                    parallel: false,
-                })
-                .unwrap_or_else(|_: InvalidCommandSequence| {
-                    panic!("FlexSPI driver reported invalid command sequence for hard-coded read sequence")
-                });
+            unsafe {
+                self.flex_spi
+                    .start_command_sequence(CommandSequence {
+                        start: sequence::READ,
+                        count: 1,
+                        address,
+                        data_size: buffer.len() as u16,
+                        parallel: false,
+                    })
+                    .unwrap_or_else(|_: InvalidCommandSequence| {
+                        panic!("FlexSPI driver reported invalid command sequence for hard-coded read sequence")
+                    });
+            }
 
             // Drain the RX queue until the read buffer is full.
             while !buffer.is_empty() {
@@ -188,17 +194,19 @@ impl<'a> FlexSpiNorFlash<'a> {
         // TODO: verify address is aligned to a sector.
         self.set_and_verify_write_enable()?;
 
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::ERASE_SECTOR,
-                count: 1,
-                address,
-                data_size: 0,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::ERASE_SECTOR,
+                    count: 1,
+                    address,
+                    data_size: 0,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
+                });
+        }
 
         self.flex_spi.wait_command_done().map_err(WriteError::WaitFinish)?;
         self.wait_write_not_in_progress()?;
@@ -214,17 +222,19 @@ impl<'a> FlexSpiNorFlash<'a> {
         // TODO: verify address is aligned to a block.
         self.set_and_verify_write_enable()?;
 
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::ERASE_BLOCK,
-                count: 1,
-                address,
-                data_size: 0,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::ERASE_BLOCK,
+                    count: 1,
+                    address,
+                    data_size: 0,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
+                });
+        }
 
         self.flex_spi.wait_command_done().map_err(WriteError::WaitFinish)?;
         self.wait_write_not_in_progress()?;
@@ -237,17 +247,19 @@ impl<'a> FlexSpiNorFlash<'a> {
     pub fn erase_chip(&mut self) -> Result<(), WriteError> {
         self.set_and_verify_write_enable()?;
 
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::CHIP_ERASE,
-                count: 1,
-                address: 0,
-                data_size: 0,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::CHIP_ERASE,
+                    count: 1,
+                    address: 0,
+                    data_size: 0,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded erase sector sequence")
+                });
+        }
 
         self.flex_spi.wait_command_done().map_err(WriteError::WaitFinish)?;
         self.wait_write_not_in_progress()?;
@@ -276,17 +288,19 @@ impl<'a> FlexSpiNorFlash<'a> {
         self.flex_spi.clear_tx_fifo();
 
         // Start the command.
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::PAGE_PROGRAM,
-                count: 1,
-                address,
-                data_size: data.len() as u16,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded page program sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::PAGE_PROGRAM,
+                    count: 1,
+                    address,
+                    data_size: data.len() as u16,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded page program sequence")
+                });
+        }
 
         // TODO: Verify write in progress?
 
@@ -316,17 +330,19 @@ impl<'a> FlexSpiNorFlash<'a> {
     /// The status of the flash memory is checked before write operations automatically.
     pub fn read_status(&mut self) -> Result<Status, ReadError> {
         self.flex_spi.clear_rx_fifo();
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::READ_STATUS_XPI,
-                count: 1,
-                address: 0,
-                data_size: 4,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded read status (XPI) sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::READ_STATUS_XPI,
+                    count: 1,
+                    address: 0,
+                    data_size: 4,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded read status (XPI) sequence")
+                });
+        }
 
         self.flex_spi.wait_command_done().map_err(ReadError::WaitFinish)?;
 
@@ -348,17 +364,19 @@ impl<'a> FlexSpiNorFlash<'a> {
 
     /// Set the write enable latch without verifying that it is actually enabled.
     fn set_write_enable(&mut self) -> Result<(), super::peripheral::WaitCommandError> {
-        self.flex_spi
-            .start_command_sequence(CommandSequence {
-                start: sequence::WRITE_ENABLE_XPI,
-                count: 1,
-                address: 0,
-                data_size: 0,
-                parallel: false,
-            })
-            .unwrap_or_else(|_: InvalidCommandSequence| {
-                panic!("FlexSPI driver reported invalid command sequence for hard-coded write enable sequence")
-            });
+        unsafe {
+            self.flex_spi
+                .start_command_sequence(CommandSequence {
+                    start: sequence::WRITE_ENABLE_XPI,
+                    count: 1,
+                    address: 0,
+                    data_size: 0,
+                    parallel: false,
+                })
+                .unwrap_or_else(|_: InvalidCommandSequence| {
+                    panic!("FlexSPI driver reported invalid command sequence for hard-coded write enable sequence")
+                });
+        }
         self.flex_spi.wait_command_done()
     }
 
