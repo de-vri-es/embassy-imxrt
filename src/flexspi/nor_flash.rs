@@ -84,6 +84,20 @@ impl<'a> FlexSpiNorFlash<'a> {
         me.flex_spi.set_rx_fifo_watermark_u64_words(16);
         me.flex_spi.set_tx_fifo_watermark_u64_words(16);
 
+        let mut fcb = [0; 512];
+        if let Err(e) = me.read(0x400, &mut fcb) {
+            panic!("Failed to read FCB: {}", e);
+        }
+
+        let fcb_lut = &fcb[0x80..][..256];
+        for (i, sequence) in fcb_lut.chunks_exact(16).enumerate() {
+            let word1 = u32::from_ne_bytes(sequence[0..][..4].try_into().unwrap_or_else(|_| panic!()));
+            let word2 = u32::from_ne_bytes(sequence[4..][..4].try_into().unwrap_or_else(|_| panic!()));
+            let word3 = u32::from_ne_bytes(sequence[8..][..4].try_into().unwrap_or_else(|_| panic!()));
+            let word4 = u32::from_ne_bytes(sequence[12..][..4].try_into().unwrap_or_else(|_| panic!()));
+            me.flex_spi.write_lut_sequence(i, [word1, word2, word3, word4]);
+        }
+
         me
     }
 
